@@ -1,0 +1,1 @@
+App para buscar a meteorologia atual da cidade escolhida. Infraestrutura na AWS com Terraform e Cloud Formation.
