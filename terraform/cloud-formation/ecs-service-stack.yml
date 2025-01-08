@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: The template used to create an ECS Service together with Terraform.
+Parameters:
+  ECSClusterName:
+    Type: String
+  ECSServiceName:
+    Type: String
+  ContainersSecurityGroupIDs:
+    Type: CommaDelimitedList
+  SubnetIDs:
+    Type: CommaDelimitedList
+  VpcID:
+    Type: String
+  LoadBalancerName:
+    Type: String
+  LoadBalancerSecurityGroupIDs:
+    Type: CommaDelimitedList
+  TargetGroupName:
+    Type: String
+  TaskDefinition:
+    Type: String
+  ContainerName:
+    Type: String
+  ContainerPort:
+    Type: String
+Resources:
+  ECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Ref: ECSClusterName
+      TaskDefinition:
+        Ref: TaskDefinition
+      ServiceName:
+        Ref: ECSServiceName
+      SchedulingStrategy: REPLICA
+      DesiredCount: 1
+      LoadBalancers:
+        - ContainerName:
+            Ref: ContainerName
+          ContainerPort:
+            Ref: ContainerPort
+          LoadBalancerName:
+            Ref: AWS::NoValue
+          TargetGroupArn:
+            Ref: TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            Ref: ContainersSecurityGroupIDs
+          Subnets:
+            Ref: SubnetIDs
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      DeploymentController:
+        Type: ECS
+      ServiceConnectConfiguration:
+        Enabled: false
+      PlacementStrategies:
+        - Field: attribute:ecs.availability-zone
+          Type: spread
+        - Field: instanceId
+          Type: spread
+      PlacementConstraints: []
+      Tags: []
+      EnableECSManagedTags: true
+    DependsOn:
+      - Listener
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Name:
+        Ref: LoadBalancerName
+      SecurityGroups:
+        Ref: LoadBalancerSecurityGroupIDs
+      Subnets:
+        Ref: SubnetIDs
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckPath: /
+      Name:
+        Ref: TargetGroupName
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckProtocol: HTTP
+      VpcId:
+        Ref: VpcID
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "300"
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: TargetGroup
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 80
+      Protocol: HTTP
+Outputs:
+  ClusterName:
+    Description: The cluster used to create the service.
+    Value:
+      Ref: ECSClusterName
+  ECSService:
+    Description: The created service.
+    Value:
+      Ref: ECSService
+  LoadBalancer:
+    Description: The created load balancer.
+    Value:
+      Ref: LoadBalancer
+  Listener:
+    Description: The created listener.
+    Value:
+      Ref: Listener
+  TargetGroup:
+    Description: The created target group.
+    Value:
+      Ref: TargetGroup
